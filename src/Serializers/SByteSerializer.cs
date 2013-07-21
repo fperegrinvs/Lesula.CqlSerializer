@@ -34,16 +34,8 @@ namespace ProtoBuf.Serializers
             Helpers.DebugAssert(value == null); // since replaces
             return source.ReadSByte();
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            ProtoWriter.WriteSByte((sbyte)value, dest);
-        }
 #endif
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.EmitBasicWrite("WriteSByte", valueFrom);
-        }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             ctx.EmitBasicRead("ReadSByte", ExpectedType);

@@ -82,32 +82,10 @@ namespace ProtoBuf.Serializers
             Helpers.DebugAssert(value == null); // since replaces
             return parse.Invoke(null, new object[] { source.ReadString() });
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            ProtoWriter.WriteString(value.ToString(), dest);
-        }
+
 #endif
 
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            Type type = ExpectedType;
-            if (type.IsValueType)
-            {   // note that for structs, we've already asserted that a custom ToString
-                // exists; no need to handle the box/callvirt scenario
-                
-                // force it to a variable if needed, so we can take the address
-                using (Compiler.Local loc = ctx.GetLocalWithValue(type, valueFrom))
-                {
-                    ctx.LoadAddress(loc, type);
-                    ctx.EmitCall(GetCustomToString(type));
-                }
-            }
-            else {
-                ctx.EmitCall(ctx.MapType(typeof(object)).GetMethod("ToString"));
-            }
-            ctx.EmitBasicWrite("WriteString", valueFrom);
-        }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             ctx.EmitBasicRead("ReadString", ctx.MapType(typeof(string)));

@@ -33,18 +33,10 @@ namespace ProtoBuf.Serializers
         {
             return ProtoReader.AppendBytes(overwriteList ? null : (byte[])value, source);
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            ProtoWriter.WriteBytes((byte[])value, dest);
-        }
 #endif
         bool IProtoSerializer.RequiresOldValue { get { return !overwriteList; } }
         bool IProtoSerializer.ReturnsValue { get { return true; } }
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.EmitBasicWrite("WriteBytes", valueFrom);
-        }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             if (overwriteList)

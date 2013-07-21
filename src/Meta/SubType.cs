@@ -7,7 +7,7 @@ namespace ProtoBuf.Meta
     /// <summary>
     /// Represents an inherited type in a type hierarchy.
     /// </summary>
-    public sealed class SubType
+    internal sealed class SubType
     {
         internal class Comparer : System.Collections.IComparer
 #if !NO_GENERICS

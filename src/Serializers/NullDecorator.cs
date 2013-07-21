@@ -109,45 +109,6 @@ namespace ProtoBuf.Serializers
                 ctx.LoadValue(oldValue); // load the old value
             }
         }
-        protected override void EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            using(Compiler.Local valOrNull = ctx.GetLocalWithValue(expectedType, valueFrom))
-            using(Compiler.Local token = new Compiler.Local(ctx, ctx.MapType(typeof(SubItemToken))))
-            {
-                ctx.LoadNullRef();
-                ctx.LoadReaderWriter();
-                ctx.EmitCall(ctx.MapType(typeof(ProtoWriter)).GetMethod("StartSubItem"));
-                ctx.StoreValue(token);
-                
-                if (expectedType.IsValueType)
-                {
-                    ctx.LoadAddress(valOrNull, expectedType);
-                    ctx.LoadValue(expectedType.GetProperty("HasValue"));
-                }
-                else
-                {
-                    ctx.LoadValue(valOrNull);
-                }
-                Compiler.CodeLabel @end = ctx.DefineLabel();
-                ctx.BranchIfFalse(@end, false);
-                if (expectedType.IsValueType)
-                {
-                    ctx.LoadAddress(valOrNull, expectedType);
-                    ctx.EmitCall(expectedType.GetMethod("GetValueOrDefault", Helpers.EmptyTypes));
-                }
-                else
-                {
-                    ctx.LoadValue(valOrNull);
-                }
-                Tail.EmitWrite(ctx, null);
-
-                ctx.MarkLabel(@end);
-
-                ctx.LoadValue(token);
-                ctx.LoadReaderWriter();
-                ctx.EmitCall(ctx.MapType(typeof(ProtoWriter)).GetMethod("EndSubItem"));
-            }
-        }
 #endif
 
 #if !FEAT_IKVM
@@ -165,15 +126,6 @@ namespace ProtoBuf.Serializers
             }
             ProtoReader.EndSubItem(tok, source);
             return value;
-        }
-        public override void Write(object value, ProtoWriter dest)
-        {
-            SubItemToken token = ProtoWriter.StartSubItem(null, dest);
-            if(value != null)
-            {
-                Tail.Write(value, dest);
-            }
-            ProtoWriter.EndSubItem(token, dest);
         }
 #endif
     }

@@ -86,10 +86,7 @@ namespace ProtoBuf.Serializers
         }
 
 #if !FEAT_IKVM
-        public void Write(object value, ProtoWriter writer)
-        {
-            rootTail.Write(toTail.Invoke(null, new object[] { value }), writer);
-        }
+
         public object Read(object value, ProtoReader source)
         {
             // convert the incoming value
@@ -118,13 +115,6 @@ namespace ProtoBuf.Serializers
                 ctx.EmitCall(fromTail);  // static convert op, surrogate-to-primary
                 ctx.StoreValue(valueFrom); // store back into primary
             }
-        }
-
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.LoadValue(valueFrom);
-            ctx.EmitCall(toTail);
-            rootTail.EmitWrite(ctx, null);
         }
 #endif
     }

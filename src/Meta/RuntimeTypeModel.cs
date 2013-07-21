@@ -23,7 +23,7 @@ namespace ProtoBuf.Meta
     /// <summary>
     /// Provides protobuf serialization support for a number of types that can be defined at runtime
     /// </summary>
-    public sealed class RuntimeTypeModel : TypeModel
+    internal sealed class RuntimeTypeModel : TypeModel
     {
         private byte options;
         private const byte
@@ -121,115 +121,6 @@ namespace ProtoBuf.Meta
         /// </summary>
         public IEnumerable GetTypes() { return types; }
 
-        /// <summary>
-        /// Suggest a .proto definition for the given type
-        /// </summary>
-        /// <param name="type">The type to generate a .proto definition for, or <c>null</c> to generate a .proto that represents the entire model</param>
-        /// <returns>The .proto definition as a string</returns>
-        public override string GetSchema(Type type)
-        {
-            BasicList requiredTypes = new BasicList();
-            MetaType primaryType = null;
-            bool isInbuiltType = false;
-            if (type == null)
-            { // generate for the entire model
-                foreach(MetaType meta in types)
-                {
-                    MetaType tmp = meta.GetSurrogateOrBaseOrSelf();
-                    if (!requiredTypes.Contains(tmp))
-                    { // ^^^ note that the type might have been added as a descendent
-                        requiredTypes.Add(tmp);
-                        CascadeDependents(requiredTypes, tmp);
-                    }
-                }
-            }
-            else
-            {
-                Type tmp = Helpers.GetUnderlyingType(type);
-                if (tmp != null) type = tmp;
-
-                WireType defaultWireType;
-                isInbuiltType = (ValueMember.TryGetCoreSerializer(this, DataFormat.Default, type, out defaultWireType, false, false, false, false) != null);
-                if (!isInbuiltType)
-                {
-                    //Agenerate just relative to the supplied type
-                    int index = FindOrAddAuto(type, false, false, false);
-                    if (index < 0) throw new ArgumentException("The type specified is not a contract-type", "type");
-
-                    // get the required types
-                    primaryType = ((MetaType)types[index]).GetSurrogateOrBaseOrSelf();
-                    requiredTypes.Add(primaryType);
-                    CascadeDependents(requiredTypes, primaryType);
-                }
-            }
-
-            // use the provided type's namespace for the "package"
-            StringBuilder headerBuilder = new StringBuilder();
-            string package = null;
-
-            if (!isInbuiltType)
-            {
-                IEnumerable typesForNamespace = primaryType == null ? types : requiredTypes;
-                foreach (MetaType meta in typesForNamespace)
-                {
-                    if (meta.IsList) continue;
-                    string tmp = meta.Type.Namespace;
-                    if (!Helpers.IsNullOrEmpty(tmp))
-                    {
-                        if (tmp.StartsWith("System.")) continue;
-                        if (package == null)
-                        { // haven't seen any suggestions yet
-                            package = tmp;
-                        }
-                        else if (package == tmp)
-                        { // that's fine; a repeat of the one we already saw
-                        }
-                        else
-                        { // something else; have confliucting suggestions; abort
-                            package = null;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!Helpers.IsNullOrEmpty(package))
-            {
-                headerBuilder.Append("package ").Append(package).Append(';');
-                Helpers.AppendLine(headerBuilder);
-            }
-
-            bool requiresBclImport = false;
-            StringBuilder bodyBuilder = new StringBuilder();
-            // sort them by schema-name
-            MetaType[] metaTypesArr = new MetaType[requiredTypes.Count];
-            requiredTypes.CopyTo(metaTypesArr, 0);
-            Array.Sort(metaTypesArr, MetaType.Comparer.Default);
-
-            // write the messages
-            if (isInbuiltType)
-            {
-                Helpers.AppendLine(bodyBuilder).Append("message ").Append(type.Name).Append(" {");
-                MetaType.NewLine(bodyBuilder, 1).Append("optional ").Append(GetSchemaTypeName(type, DataFormat.Default, false, false, ref requiresBclImport))
-                    .Append(" value = 1;");
-                Helpers.AppendLine(bodyBuilder).Append('}');
-            }
-            else
-            {
-                for (int i = 0; i < metaTypesArr.Length; i++)
-                {
-                    MetaType tmp = metaTypesArr[i];
-                    if (tmp.IsList && tmp != primaryType) continue;
-                    tmp.WriteSchema(bodyBuilder, 0, ref requiresBclImport);
-                }
-            }
-            if (requiresBclImport)
-            {
-                headerBuilder.Append("import \"bcl.proto\" // schema for protobuf-net's handling of core .NET types");
-                Helpers.AppendLine(headerBuilder);
-            }
-            return Helpers.AppendLine(headerBuilder.Append(bodyBuilder)).ToString();
-        }
         private void CascadeDependents(BasicList list, MetaType metaType)
         {
             MetaType tmp;
@@ -556,12 +447,8 @@ namespace ProtoBuf.Meta
             if (newType != null) return newType; // return existing
             int opaqueToken = 0;
             
-#if WINRT
-            System.Reflection.TypeInfo typeInfo = System.Reflection.IntrospectionExtensions.GetTypeInfo(type);
-            if (typeInfo.IsInterface && MetaType.ienumerable.IsAssignableFrom(typeInfo)
-#else
+
             if (type.IsInterface && MapType(MetaType.ienumerable).IsAssignableFrom(type)
-#endif
                     && GetListItemType(this, type) == null)
             {
                 throw new ArgumentException("IEnumerable[<T>] data cannot be used as a meta-type unless an Add method can be resolved");
@@ -677,21 +564,7 @@ namespace ProtoBuf.Meta
                 throw new ProtoException(ex.Message + " (" + type.FullName + ")", ex);
             }
         }
-        /// <summary>
-        /// Writes a protocol-buffer representation of the given instance to the supplied stream.
-        /// </summary>
-        /// <param name="key">Represents the type (including inheritance) to consider.</param>
-        /// <param name="value">The existing instance to be serialized (cannot be null).</param>
-        /// <param name="dest">The destination stream to write to.</param>
-        protected internal override void Serialize(int key, object value, ProtoWriter dest)
-        {
-#if FEAT_IKVM
-            throw new NotSupportedException();
-#else
-            //Helpers.DebugWriteLine("Serialize", value);
-            ((MetaType)types[key]).Serializer.Write(value, dest);
-#endif
-        }
+
         /// <summary>
         /// Applies a protocol-buffer stream to an existing instance (which may be null).
         /// </summary>
@@ -718,18 +591,7 @@ namespace ProtoBuf.Meta
         }
 
 #if FEAT_COMPILER
-        internal Compiler.ProtoSerializer GetSerializer(IProtoSerializer serializer, bool compiled)
-        {
-#if FEAT_IKVM
-            throw new NotSupportedException();
-#else
-            if (serializer == null) throw new ArgumentNullException("serializer");
-#if FEAT_COMPILER && !FX11
-            if (compiled) return Compiler.CompilerContext.BuildSerializer(serializer, this);
-#endif
-            return new Compiler.ProtoSerializer(serializer.Write);
-#endif
-        }
+
 
 #if !FX11
         /// <summary>
@@ -812,14 +674,11 @@ namespace ProtoBuf.Meta
             public readonly MetaType Type;
             public readonly MethodBuilder Serialize, Deserialize;
             public readonly ILGenerator SerializeBody, DeserializeBody;
-            public SerializerPair(int metaKey, int baseKey, MetaType type, MethodBuilder serialize, MethodBuilder deserialize,
-                ILGenerator serializeBody, ILGenerator deserializeBody)
+            public SerializerPair(int metaKey, int baseKey, MetaType type, MethodBuilder deserialize, ILGenerator deserializeBody)
             {
                 this.MetaKey = metaKey;
                 this.BaseKey = baseKey;
-                this.Serialize = serialize;
                 this.Deserialize = deserialize;
-                this.SerializeBody = serializeBody;
                 this.DeserializeBody = deserializeBody;
                 this.Type = type;
             }
@@ -1131,14 +990,6 @@ namespace ProtoBuf.Meta
             SerializerPair[] methodPairs = new SerializerPair[types.Count];
             foreach (MetaType metaType in types)
             {
-                MethodBuilder writeMethod = type.DefineMethod("Write"
-#if DEBUG
- + metaType.Type.Name
-#endif
-                    ,
-                    MethodAttributes.Private | MethodAttributes.Static, CallingConventions.Standard,
-                    MapType(typeof(void)), new Type[] { metaType.Type, MapType(typeof(ProtoWriter)) });
-
                 MethodBuilder readMethod = type.DefineMethod("Read"
 #if DEBUG
  + metaType.Type.Name
@@ -1148,8 +999,7 @@ namespace ProtoBuf.Meta
                     metaType.Type, new Type[] { metaType.Type, MapType(typeof(ProtoReader)) });
 
                 SerializerPair pair = new SerializerPair(
-                    GetKey(metaType.Type, true, false), GetKey(metaType.Type, true, true), metaType,
-                    writeMethod, readMethod, writeMethod.GetILGenerator(), readMethod.GetILGenerator());
+                    GetKey(metaType.Type, true, false), GetKey(metaType.Type, true, true), metaType, readMethod, readMethod.GetILGenerator());
                 methodPairs[index++] = pair;
                 if (pair.MetaKey != pair.BaseKey) hasInheritance = true;
             }
@@ -1168,7 +1018,6 @@ namespace ProtoBuf.Meta
                 SerializerPair pair = methodPairs[index];
                 ctx = new Compiler.CompilerContext(pair.SerializeBody, true, true, methodPairs, this, ilVersion, assemblyName);
                 ctx.CheckAccessibility(pair.Deserialize.ReturnType);
-                pair.Type.Serializer.EmitWrite(ctx, Compiler.Local.InputValue);
                 ctx.Return();
 
                 ctx = new Compiler.CompilerContext(pair.DeserializeBody, true, false, methodPairs, this, ilVersion, assemblyName);

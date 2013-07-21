@@ -33,13 +33,6 @@ namespace ProtoBuf.Serializers
             this.defaultValue = defaultValue;
         }
 #if !FEAT_IKVM
-        public override void Write(object value, ProtoWriter dest)
-        {
-            if (!object.Equals(value, defaultValue))
-            {
-                Tail.Write(value, dest);
-            }
-        }
         public override object Read(object value, ProtoReader source)
         {
             return Tail.Read(value, source);
@@ -47,27 +40,6 @@ namespace ProtoBuf.Serializers
 #endif
 
 #if FEAT_COMPILER
-        protected override void EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            Compiler.CodeLabel done = ctx.DefineLabel();
-            if (valueFrom == null)
-            {
-                ctx.CopyValue(); // on the stack
-                Compiler.CodeLabel needToPop = ctx.DefineLabel();
-                EmitBranchIfDefaultValue(ctx, needToPop);
-                Tail.EmitWrite(ctx, null);
-                ctx.Branch(done, true);
-                ctx.MarkLabel(needToPop);
-                ctx.DiscardValue();
-            }
-            else
-            {
-                ctx.LoadValue(valueFrom); // variable/parameter
-                EmitBranchIfDefaultValue(ctx, done);
-                Tail.EmitWrite(ctx, valueFrom);
-            }
-            ctx.MarkLabel(done);
-        }
         private void EmitBeq(Compiler.CompilerContext ctx, Compiler.CodeLabel label, Type type)
         {
             switch (Helpers.GetTypeCode(type))

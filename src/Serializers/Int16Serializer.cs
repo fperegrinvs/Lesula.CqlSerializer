@@ -33,16 +33,9 @@ namespace ProtoBuf.Serializers
             Helpers.DebugAssert(value == null); // since replaces
             return source.ReadInt16();
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            ProtoWriter.WriteInt16((short)value, dest);
-        }
 #endif
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.EmitBasicWrite("WriteInt16", valueFrom);
-        }
+
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             ctx.EmitBasicRead("ReadInt16", ExpectedType);

@@ -29,10 +29,6 @@ namespace ProtoBuf.Serializers
         
 
 #if !FEAT_IKVM
-        public override void Write(object value, ProtoWriter dest)
-        {
-            Tail.Write(((Uri)value).AbsoluteUri, dest);
-        }
         public override object Read(object value, ProtoReader source)
         {
             Helpers.DebugAssert(value == null); // not expecting incoming
@@ -42,12 +38,6 @@ namespace ProtoBuf.Serializers
 #endif
 
 #if FEAT_COMPILER
-        protected override void EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.LoadValue(valueFrom);
-            ctx.LoadValue(typeof(Uri).GetProperty("AbsoluteUri"));
-            Tail.EmitWrite(ctx, null);
-        }
         protected override void EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             Tail.EmitRead(ctx, valueFrom);

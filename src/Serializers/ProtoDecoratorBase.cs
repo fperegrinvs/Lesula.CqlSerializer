@@ -19,13 +19,10 @@ namespace ProtoBuf.Serializers
         public abstract bool ReturnsValue { get; }
         public abstract bool RequiresOldValue { get; }
 #if !FEAT_IKVM
-        public abstract void Write(object value, ProtoWriter dest);
         public abstract object Read(object value, ProtoReader source);
 #endif
 
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom) { EmitWrite(ctx, valueFrom); }
-        protected abstract void EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom);
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom) { EmitRead(ctx, valueFrom); }
         protected abstract void EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom);
 #endif

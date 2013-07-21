@@ -65,22 +65,10 @@ namespace ProtoBuf.Serializers
             else if (NeedsHint) { source.Hint(wireType); }
             return Tail.Read(value, source);
         }
-        public override void Write(object value, ProtoWriter dest)
-        {
-            ProtoWriter.WriteFieldHeader(fieldNumber, wireType, dest);
-            Tail.Write(value, dest);
-        }
+
 #endif
 
 #if FEAT_COMPILER
-        protected override void EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.LoadValue((int)fieldNumber);
-            ctx.LoadValue((int)wireType);
-            ctx.LoadReaderWriter();
-            ctx.EmitCall(ctx.MapType(typeof(ProtoWriter)).GetMethod("WriteFieldHeader"));
-            Tail.EmitWrite(ctx, valueFrom);    
-        }
         protected override void EmitRead(ProtoBuf.Compiler.CompilerContext ctx, ProtoBuf.Compiler.Local valueFrom)
         {
             if (strict || NeedsHint)

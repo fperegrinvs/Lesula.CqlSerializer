@@ -5,18 +5,7 @@ using System.Text;
 using ProtoBuf.Serializers;
 
 
-#if FEAT_IKVM
-using Type = IKVM.Reflection.Type;
-using IKVM.Reflection;
-#if FEAT_COMPILER
-using IKVM.Reflection.Emit;
-#endif
-#else
 using System.Reflection;
-#if FEAT_COMPILER
-using System.Reflection.Emit;
-#endif
-#endif
 
 
 namespace ProtoBuf.Meta
@@ -24,7 +13,7 @@ namespace ProtoBuf.Meta
     /// <summary>
     /// Represents a type at runtime for use with protobuf, allowing the field mappings (etc) to be defined
     /// </summary>
-    public class MetaType : ISerializerProxy
+    internal class MetaType : ISerializerProxy
     {
         internal class Comparer : IComparer
 #if !NO_GENERICS
@@ -445,11 +434,7 @@ namespace ProtoBuf.Meta
             {
                 foreach (SubType subType in subTypes)
                 {
-#if WINRT
-                    if (!subType.DerivedType.IgnoreListHandling && ienumerable.IsAssignableFrom(subType.DerivedType.Type.GetTypeInfo()))
-#else
                     if (!subType.DerivedType.IgnoreListHandling && model.MapType(ienumerable).IsAssignableFrom(subType.DerivedType.Type))
-#endif
                     {
                         throw new ArgumentException("Repeated data (a list, collection, etc) has inbuilt behaviour and cannot be used as a subclass");
                     }
@@ -528,35 +513,6 @@ namespace ProtoBuf.Meta
             {
                 AttributeMap item = (AttributeMap)typeAttribs[i];
                 object tmp;
-                if (!isEnum && item.AttributeType.FullName == "ProtoBuf.ProtoIncludeAttribute")
-                {
-                    int tag = 0;
-                    if (item.TryGet("tag", out tmp)) tag = (int)tmp;
-                    DataFormat dataFormat = DataFormat.Default;
-                    if(item.TryGet("DataFormat", out tmp))
-                    {
-                        dataFormat = (DataFormat)(int) tmp;
-                    }
-                    Type knownType = null;
-                    try
-                    {
-                        if (item.TryGet("knownTypeName", out tmp)) knownType = model.GetType((string)tmp, type
-#if WINRT
-                            .GetTypeInfo()
-#endif       
-                            .Assembly);
-                        else if (item.TryGet("knownType", out tmp)) knownType = (Type)tmp;
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new InvalidOperationException("Unable to resolve sub-type of: " + type.FullName, ex);
-                    }
-                    if (knownType == null)
-                    {
-                        throw new InvalidOperationException("Unable to resolve sub-type of: " + type.FullName);
-                    }
-                    if(IsValidSubType(knownType)) AddSubType(tag, knownType, dataFormat);
-                }
                 
                 if(item.AttributeType.FullName == "ProtoBuf.ProtoPartialIgnoreAttribute")
                 {
@@ -645,7 +601,6 @@ namespace ProtoBuf.Meta
                 foreach (MemberInfo member in foundList)
             {
                 if (member.DeclaringType != type) continue;
-                if (member.IsDefined(model.MapType(typeof(ProtoIgnoreAttribute)), true)) continue;
                 if (partialIgnores != null && partialIgnores.Contains(member.Name)) continue;
 
                 bool forced = false, isPublic, isField;
@@ -1303,39 +1258,11 @@ namespace ProtoBuf.Meta
         {
             return AddField(fieldNumber, memberName, itemType, defaultType, null);
         }
-        
-        private ValueMember AddField(int fieldNumber, string memberName, Type itemType, Type defaultType, object defaultValue)
+
+        public ValueMember AddField(int fieldNumber, MemberInfo mi, Type itemType, Type defaultType, object defaultValue)
         {
-            MemberInfo mi = null;
-#if WINRT
-            mi = Helpers.IsEnum(type) ? type.GetTypeInfo().GetDeclaredField(memberName) : Helpers.GetInstanceMember(type.GetTypeInfo(), memberName);
-
-#else
-            MemberInfo[] members = type.GetMember(memberName, Helpers.IsEnum(type) ? BindingFlags.Static | BindingFlags.Public : BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if(members != null && members.Length == 1) mi = members[0];
-#endif
-            if (mi == null) throw new ArgumentException("Unable to determine member: " + memberName, "memberName");
-
             Type miType;
-#if WINRT || PORTABLE
-            PropertyInfo pi = mi as PropertyInfo;
-            if (pi == null)
-            {
-                FieldInfo fi = mi as FieldInfo;
-                if (fi == null)
-                {
-                    throw new NotSupportedException(mi.GetType().Name);
-                }
-                else
-                {
-                    miType = fi.FieldType;
-                }
-            }
-            else
-            {
-                miType = pi.PropertyType;
-            }
-#else   
+
             switch (mi.MemberType)
             {
                 case MemberTypes.Field:
@@ -1345,7 +1272,32 @@ namespace ProtoBuf.Meta
                 default:
                     throw new NotSupportedException(mi.MemberType.ToString());
             }
-#endif
+
+            ResolveListTypes(model, miType, ref itemType, ref defaultType);
+            ValueMember newField = new ValueMember(model, type, fieldNumber, mi, miType, itemType, defaultType, DataFormat.Default, defaultValue);
+            Add(newField);
+            return newField;
+        }
+        
+        private ValueMember AddField(int fieldNumber, string memberName, Type itemType, Type defaultType, object defaultValue)
+        {
+            MemberInfo mi = null;
+            MemberInfo[] members = type.GetMember(memberName, Helpers.IsEnum(type) ? BindingFlags.Static | BindingFlags.Public : BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if(members != null && members.Length == 1) mi = members[0];
+            if (mi == null) throw new ArgumentException("Unable to determine member: " + memberName, "memberName");
+
+            Type miType;
+  
+            switch (mi.MemberType)
+            {
+                case MemberTypes.Field:
+                    miType = ((FieldInfo)mi).FieldType; break;
+                case MemberTypes.Property:
+                    miType = ((PropertyInfo)mi).PropertyType; break;
+                default:
+                    throw new NotSupportedException(mi.MemberType.ToString());
+            }
+
             ResolveListTypes(model, miType, ref itemType, ref defaultType);
             ValueMember newField = new ValueMember(model, type, fieldNumber, mi, miType, itemType, defaultType, DataFormat.Default, defaultValue);
             Add(newField);

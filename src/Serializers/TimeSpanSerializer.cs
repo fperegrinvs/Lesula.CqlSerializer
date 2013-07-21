@@ -35,16 +35,8 @@ namespace ProtoBuf.Serializers
             Helpers.DebugAssert(value == null); // since replaces
             return BclHelpers.ReadTimeSpan(source);
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            BclHelpers.WriteTimeSpan((TimeSpan)value, dest);
-        }
 #endif
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.EmitWrite(ctx.MapType(typeof(BclHelpers)), "WriteTimeSpan", valueFrom);
-        }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             ctx.EmitBasicRead(ctx.MapType(typeof(BclHelpers)), "ReadTimeSpan", ExpectedType);

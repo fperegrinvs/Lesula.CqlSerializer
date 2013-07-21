@@ -50,17 +50,6 @@ namespace ProtoBuf.Compiler
         }
 
 #if !(FX11 || FEAT_IKVM)
-        public static ProtoSerializer BuildSerializer(IProtoSerializer head, TypeModel model)
-        {
-            Type type = head.ExpectedType;
-            CompilerContext ctx = new CompilerContext(type, true, true, model);
-            ctx.LoadValue(Local.InputValue);
-            ctx.CastFromObject(type);
-            ctx.WriteNullCheckedTail(type, head, null);
-            ctx.Emit(OpCodes.Ret);
-            return (ProtoSerializer)ctx.method.CreateDelegate(
-                typeof(ProtoSerializer));
-        }
         /*public static ProtoCallback BuildCallback(IProtoTypeSerializer head)
         {
             Type type = head.ExpectedType;
@@ -275,16 +264,9 @@ namespace ProtoBuf.Compiler
             nonPublic = true;
             Type[] paramTypes;
             Type returnType;
-            if (isWriter)
-            {
-                returnType = typeof(void);
-                paramTypes = new Type[] { typeof(object), typeof(ProtoWriter) };
-            }
-            else
-            {
+
                 returnType = typeof(object);
                 paramTypes = new Type[] { typeof(object), typeof(ProtoReader) };
-            }
             int uniqueIdentifier;
 #if PLAT_NO_INTERLOCKED
             uniqueIdentifier = ++next;
@@ -497,35 +479,6 @@ namespace ProtoBuf.Compiler
             LoadReaderWriter();
             EmitCall(method);
         }
-        internal void EmitBasicWrite(string methodName, Compiler.Local fromValue)
-        {
-            if (Helpers.IsNullOrEmpty(methodName)) throw new ArgumentNullException("methodName");
-            LoadValue(fromValue);
-            LoadReaderWriter();
-            EmitCall(GetWriterMethod(methodName));
-        }
-        private MethodInfo GetWriterMethod(string methodName)
-        {
-            Type writerType = MapType(typeof(ProtoWriter));
-            MethodInfo[] methods = writerType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            foreach (MethodInfo method in methods)
-            {
-                if(method.Name != methodName) continue;
-                ParameterInfo[] pis = method.GetParameters();
-                if (pis.Length == 2 && pis[1].ParameterType == writerType) return method;
-            }
-            throw new ArgumentException("No suitable method found for: " + methodName, "methodName");
-        }
-        internal void EmitWrite(Type helperType, string methodName, Compiler.Local valueFrom)
-        {
-            if (Helpers.IsNullOrEmpty(methodName)) throw new ArgumentNullException("methodName");
-            MethodInfo method = helperType.GetMethod(
-                methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            if (method == null || method.ReturnType != MapType(typeof(void))) throw new ArgumentException("methodName");
-            LoadValue(valueFrom);
-            LoadReaderWriter();
-            EmitCall(method);
-        }
         public void EmitCall(MethodInfo method)
         {
             Helpers.DebugAssert(method != null);
@@ -547,47 +500,6 @@ namespace ProtoBuf.Compiler
         }
 
         private int nextLabel;
-
-        internal void WriteNullCheckedTail(Type type, IProtoSerializer tail, Compiler.Local valueFrom)
-        {
-            if (type.IsValueType)
-            {
-                Type underlyingType = null;
-#if !FX11
-                underlyingType = Helpers.GetUnderlyingType(type);
-#endif
-                if (underlyingType == null)
-                { // not a nullable T; can invoke directly
-                    tail.EmitWrite(this, valueFrom);
-                }
-                else
-                { // nullable T; check HasValue
-                    using (Compiler.Local valOrNull = GetLocalWithValue(type, valueFrom))
-                    {
-                        LoadAddress(valOrNull, type);
-                        LoadValue(type.GetProperty("HasValue"));
-                        CodeLabel @end = DefineLabel();
-                        BranchIfFalse(@end, false);
-                        LoadAddress(valOrNull, type);
-                        EmitCall(type.GetMethod("GetValueOrDefault", Helpers.EmptyTypes));
-                        tail.EmitWrite(this, null);
-                        MarkLabel(@end);
-                    }
-                }
-            }
-            else
-            { // ref-type; do a null-check
-                LoadValue(valueFrom);
-                CopyValue();
-                CodeLabel hasVal = DefineLabel(), @end = DefineLabel();
-                BranchIfTrue(hasVal, true);
-                DiscardValue();
-                Branch(@end, false);
-                MarkLabel(hasVal);
-                tail.EmitWrite(this, null);
-                MarkLabel(@end);
-            }
-        }
 
         internal void ReadNullCheckedTail(Type type, IProtoSerializer tail, Compiler.Local valueFrom)
         {
@@ -683,20 +595,7 @@ namespace ProtoBuf.Compiler
             bool isTrusted = false;
             Type attributeType = MapType(typeof(System.Runtime.CompilerServices.InternalsVisibleToAttribute));
             if(attributeType == null) return false;
-#if FEAT_IKVM
-            foreach (CustomAttributeData attrib in assembly.__GetCustomAttributes(attributeType, false))
-            {
-                if (attrib.ConstructorArguments.Count == 1)
-                {
-                    string privelegedAssembly = attrib.ConstructorArguments[0].Value as string;
-                    if (privelegedAssembly == assemblyName)
-                    {
-                        isTrusted = true;
-                        break;
-                    }
-                }
-            }
-#else
+
             foreach(System.Runtime.CompilerServices.InternalsVisibleToAttribute attrib in assembly.GetCustomAttributes(attributeType, false))
             {
                 if (attrib.AssemblyName == assemblyName)
@@ -705,7 +604,7 @@ namespace ProtoBuf.Compiler
                     break;
                 }
             }
-#endif
+
             if (isTrusted)
             {
                 if (knownTrustedAssemblies == null) knownTrustedAssemblies = new BasicList();
@@ -795,24 +694,7 @@ namespace ProtoBuf.Compiler
             Helpers.DebugWriteLine(code + ": " + field + " on " + field.DeclaringType);
 #endif
         }
-#if FEAT_IKVM
-        public void StoreValue(System.Reflection.FieldInfo field)
-        {
-            StoreValue(MapType(field.DeclaringType).GetField(field.Name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance));
-        }
-        public void StoreValue(System.Reflection.PropertyInfo property)
-        {
-            StoreValue(MapType(property.DeclaringType).GetProperty(property.Name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance));
-        }
-        public void LoadValue(System.Reflection.FieldInfo field)
-        {
-            LoadValue(MapType(field.DeclaringType).GetField(field.Name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance));
-        }
-        public void LoadValue(System.Reflection.PropertyInfo property)
-        {
-            LoadValue(MapType(property.DeclaringType).GetProperty(property.Name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance));
-        }
-#endif
+
         public void StoreValue(FieldInfo field)
         {
             CheckAccessibility(field);
@@ -859,18 +741,9 @@ namespace ProtoBuf.Compiler
 
         private bool UseShortForm(Local local)
         {
-#if FX11
-            return locals.Count < 256;
-#else
             return local.Value.LocalIndex < 256;
-#endif
         }
-#if FEAT_IKVM
-        internal void LoadAddress(Local local, System.Type type)
-        {
-            LoadAddress(local, MapType(type));
-        }
-#endif
+
         internal void LoadAddress(Local local, Type type)
         {
             if (type.IsValueType)
@@ -1339,7 +1212,7 @@ namespace ProtoBuf.Compiler
         internal void LoadSerializationContext()
         {
             LoadReaderWriter();
-            LoadValue((isWriter ? typeof(ProtoWriter) : typeof(ProtoReader)).GetProperty("Context"));
+            LoadValue((typeof(ProtoReader)).GetProperty("Context"));
         }
 
         private readonly TypeModel model;

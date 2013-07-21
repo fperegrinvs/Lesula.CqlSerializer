@@ -44,10 +44,6 @@ namespace ProtoBuf.Serializers
         {
             return BclHelpers.ReadNetObject(value, source, key, type == typeof(object) ? null : type, options);
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            BclHelpers.WriteNetObject(value, dest, key, options);
-        }
 #endif
 
 #if FEAT_COMPILER

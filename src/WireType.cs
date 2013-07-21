@@ -3,7 +3,7 @@
     /// <summary>
     /// Indicates the encoding used to represent an individual value in a protobuf stream
     /// </summary>
-    public enum WireType
+    internal enum WireType
     {
         /// <summary>
         /// Represents an error condition
@@ -39,6 +39,16 @@
         /// Fixed-length 4-byte encoding
         /// </summary>10
         Fixed32 = 5,
+
+        /// <summary>
+        /// Fixed-length 2-byte encoding (short)
+        /// </summary>
+        Fixed16 = 6,
+
+        /// <summary>
+        /// Fixed-length 1-byte encoding
+        /// </summary>
+        Fixed8 = 7,
 
         /// <summary>
         /// This is not a formal wire-type in the "protocol buffers" spec, but

@@ -30,12 +30,6 @@ namespace ProtoBuf.Serializers
             this.field = field;
         }
 #if !FEAT_IKVM
-        public override void Write(object value, ProtoWriter dest)
-        {
-            Helpers.DebugAssert(value != null);
-            value = field.GetValue(value);
-            if(value != null) Tail.Write(value, dest);
-        }
         public override object Read(object value, ProtoReader source)
         {
             Helpers.DebugAssert(value != null);
@@ -46,12 +40,6 @@ namespace ProtoBuf.Serializers
 #endif
 
 #if FEAT_COMPILER
-        protected override void EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.LoadAddress(valueFrom, ExpectedType);
-            ctx.LoadValue(field);
-            ctx.WriteNullCheckedTail(field.FieldType, Tail, null);
-        }
         protected override void EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             using (Compiler.Local loc = ctx.GetLocalWithValue(ExpectedType, valueFrom))

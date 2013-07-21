@@ -35,16 +35,8 @@ namespace ProtoBuf.Serializers
             Helpers.DebugAssert(value == null); // since replaces
             return source.ReadInt64();
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            ProtoWriter.WriteInt64((long)value, dest);
-        }
 #endif
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ctx.EmitBasicWrite("WriteInt64", valueFrom);
-        }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             ctx.EmitBasicRead("ReadInt64", ExpectedType);

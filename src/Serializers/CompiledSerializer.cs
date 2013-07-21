@@ -18,7 +18,7 @@ namespace ProtoBuf.Serializers
         }
         public static CompiledSerializer Wrap(IProtoTypeSerializer head, TypeModel model)
         {
-            CompiledSerializer result = head as CompiledSerializer;
+            var result = head as CompiledSerializer;
             if (result == null)
             {
                 result = new CompiledSerializer(head, model);
@@ -27,12 +27,10 @@ namespace ProtoBuf.Serializers
             return result;
         }
         private readonly IProtoTypeSerializer head;
-        private readonly Compiler.ProtoSerializer serializer;
         private readonly Compiler.ProtoDeserializer deserializer;
         private CompiledSerializer(IProtoTypeSerializer head, TypeModel model)
         {
             this.head = head;
-            serializer = Compiler.CompilerContext.BuildSerializer(head, model);
             deserializer = Compiler.CompilerContext.BuildDeserializer(head, model);
         }
         bool IProtoSerializer.RequiresOldValue { get { return head.RequiresOldValue; } }
@@ -40,19 +38,11 @@ namespace ProtoBuf.Serializers
 
         Type IProtoSerializer.ExpectedType { get { return head.ExpectedType; } }
 
-        void IProtoSerializer.Write(object value, ProtoWriter dest)
-        {
-            serializer(value, dest);
-        }
         object IProtoSerializer.Read(object value, ProtoReader source)
         {
             return deserializer(value, source);
         }
 
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            head.EmitWrite(ctx, valueFrom);
-        }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             head.EmitRead(ctx, valueFrom);

@@ -2,12 +2,7 @@
 using System;
 using System.Collections;
 
-#if FEAT_IKVM
-using Type = IKVM.Reflection.Type;
-using IKVM.Reflection;
-#else
 using System.Reflection;
-#endif
 
 namespace ProtoBuf
 {
@@ -24,13 +19,7 @@ namespace ProtoBuf
 
         public static System.Text.StringBuilder AppendLine(System.Text.StringBuilder builder)
         {
-#if CF2
-            return builder.Append("\r\n");
-#elif FX11
-            return builder.Append(Environment.NewLine);
-#else
             return builder.AppendLine();
-#endif
         }
         public static bool IsNullOrEmpty(string value)
         { // yes, FX11 lacks this!
@@ -54,11 +43,8 @@ namespace ProtoBuf
         [System.Diagnostics.Conditional("DEBUG")]
         public static void DebugWriteLine(string message)
         {
-#if MF      
-            Microsoft.SPOT.Debug.Print(message);
-#else
+
             System.Diagnostics.Debug.WriteLine(message);
-#endif
         }
         [System.Diagnostics.Conditional("TRACE")]
         public static void TraceWriteLine(string message)
@@ -494,21 +480,7 @@ namespace ProtoBuf
 
         internal static MemberInfo[] GetInstanceFieldsAndProperties(Type type, bool publicOnly)
         {
-#if WINRT
-            System.Collections.Generic.List<MemberInfo> members = new System.Collections.Generic.List<MemberInfo>();
-            foreach(FieldInfo field in type.GetRuntimeFields())
-            {
-                if(field.IsStatic) continue;
-                if(field.IsPublic || !publicOnly) members.Add(field);
-            }
-            foreach(PropertyInfo prop in type.GetRuntimeProperties())
-            {
-                MethodInfo getter = Helpers.GetGetMethod(prop, true, true);
-                if(getter == null || getter.IsStatic) continue;
-                if(getter.IsPublic || !publicOnly) members.Add(prop);
-            }
-            return members.ToArray();
-#else
+
             BindingFlags flags = publicOnly ? BindingFlags.Public | BindingFlags.Instance : BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic;
             PropertyInfo[] props = type.GetProperties(flags);
             FieldInfo[] fields = type.GetFields(flags);
@@ -516,33 +488,22 @@ namespace ProtoBuf
             props.CopyTo(members, 0);
             fields.CopyTo(members, props.Length);
             return members;
-#endif
         }
 
         internal static Type GetMemberType(MemberInfo member)
         {
-#if WINRT || PORTABLE
-            PropertyInfo prop = member as PropertyInfo;
-            if (prop != null) return prop.PropertyType;
-            FieldInfo fld = member as FieldInfo;
-            return fld == null ? null : fld.FieldType;
-#else
+
             switch(member.MemberType)
             {
                 case MemberTypes.Field: return ((FieldInfo) member).FieldType;
                 case MemberTypes.Property: return ((PropertyInfo) member).PropertyType;
                 default: return null;
             }
-#endif
         }
 
         internal static bool IsAssignableFrom(Type target, Type type)
         {
-#if WINRT
-            return target.GetTypeInfo().IsAssignableFrom(type.GetTypeInfo());
-#else
             return target.IsAssignableFrom(type);
-#endif
         }
     }
     /// <summary>

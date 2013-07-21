@@ -16,7 +16,7 @@ namespace ProtoBuf.Meta
     /// <summary>
     /// Represents a member (property/field) that is mapped to a protobuf field
     /// </summary>
-    public class ValueMember
+    internal class ValueMember
     {
         private readonly int fieldNumber;
         /// <summary>
@@ -73,11 +73,7 @@ namespace ProtoBuf.Meta
             this.member = member;
             this.parentType = parentType;
                         if (fieldNumber < 1 && !Helpers.IsEnum(parentType)) throw new ArgumentOutOfRangeException("fieldNumber");
-//#if WINRT
             if (defaultValue != null && model.MapType(defaultValue.GetType()) != memberType)
-//#else
-//            if (defaultValue != null && !memberType.IsInstanceOfType(defaultValue))
-//#endif
             {
                 defaultValue = ParseDefaultValue(memberType, defaultValue);
             }
@@ -391,7 +387,6 @@ namespace ProtoBuf.Meta
 
         private static WireType GetIntWireType(DataFormat format, int width) {
             switch(format) {
-                case DataFormat.ZigZag: return WireType.SignedVariant;
                 case DataFormat.FixedSize: return width == 32 ? WireType.Fixed32 : WireType.Fixed64;
                 case DataFormat.TwosComplement:
                 case DataFormat.Default: return WireType.Variant;

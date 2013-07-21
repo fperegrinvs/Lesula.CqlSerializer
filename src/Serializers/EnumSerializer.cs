@@ -118,63 +118,9 @@ namespace ProtoBuf.Serializers
             source.ThrowEnumException(ExpectedType, wireValue);
             return null; // to make compiler happy
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            if (map == null)
-            {
-                ProtoWriter.WriteInt32(EnumToWire(value), dest);
-            }
-            else
-            {
-                for (int i = 0; i < map.Length; i++)
-                {
-                    if (object.Equals(map[i].TypedValue, value))
-                    {
-                        ProtoWriter.WriteInt32(map[i].WireValue, dest);
-                        return;
-                    }
-                }
-                ProtoWriter.ThrowEnumException(dest, value);
-            }
-        }
+
 #endif
 #if FEAT_COMPILER
-        void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            ProtoTypeCode typeCode = GetTypeCode();
-            if (map == null)
-            {
-                ctx.LoadValue(valueFrom);
-                ctx.ConvertToInt32(typeCode, false);
-                ctx.EmitBasicWrite("WriteInt32", null);
-            }
-            else
-            {
-                using (Compiler.Local loc = ctx.GetLocalWithValue(ExpectedType, valueFrom))
-                {
-                    Compiler.CodeLabel @continue = ctx.DefineLabel();
-                    for (int i = 0; i < map.Length; i++)
-                    {
-                        Compiler.CodeLabel tryNextValue = ctx.DefineLabel(), processThisValue = ctx.DefineLabel();
-                        ctx.LoadValue(loc);
-                        WriteEnumValue(ctx, typeCode, map[i].RawValue);
-                        ctx.BranchIfEqual(processThisValue, true);
-                        ctx.Branch(tryNextValue, true);
-                        ctx.MarkLabel(processThisValue);
-                        ctx.LoadValue(map[i].WireValue);
-                        ctx.EmitBasicWrite("WriteInt32", null);
-                        ctx.Branch(@continue, false);
-                        ctx.MarkLabel(tryNextValue);
-                    }
-                    ctx.LoadReaderWriter();
-                    ctx.LoadValue(loc);
-                    ctx.CastToObject(ExpectedType);
-                    ctx.EmitCall(ctx.MapType(typeof(ProtoWriter)).GetMethod("ThrowEnumException"));
-                    ctx.MarkLabel(@continue);
-                }
-            }
-            
-        }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
             ProtoTypeCode typeCode = GetTypeCode();

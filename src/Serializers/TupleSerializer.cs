@@ -121,14 +121,6 @@ namespace ProtoBuf.Serializers
             }
             return invokeCtor ? ctor.Invoke(values) : value;
         }
-        public void Write(object value, ProtoWriter dest)
-        {
-            for (int i = 0; i < tails.Length; i++)
-            {
-                object val = GetValue(value, i);
-                if (val != null) tails[i].Write(val, dest);
-            }
-        }
 #endif
         public bool RequiresOldValue
         {
@@ -146,28 +138,6 @@ namespace ProtoBuf.Serializers
             return result;
         }
 #if FEAT_COMPILER
-        public void EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
-        {
-            using (Compiler.Local loc = ctx.GetLocalWithValue(ctor.DeclaringType, valueFrom))
-            {
-                for (int i = 0; i < tails.Length; i++)
-                {
-                    Type type = GetMemberType(i);
-                    ctx.LoadAddress(loc, ExpectedType);
-                    switch(members[i].MemberType)
-                    {
-                        case MemberTypes.Field:
-                            ctx.LoadValue((FieldInfo)members[i]);
-                            break;
-                        case MemberTypes.Property:
-                            ctx.LoadValue((PropertyInfo)members[i]);
-                            break;
-                    }
-                    ctx.WriteNullCheckedTail(type, tails[i], null);
-                }
-            }
-        }
-
         public void EmitRead(Compiler.CompilerContext ctx, Compiler.Local incoming)
         {
             using (Compiler.Local objValue = ctx.GetLocalWithValue(ExpectedType, incoming))
