@@ -39,47 +39,6 @@ namespace ProtoBuf.Cql
 
         private readonly Stream ms;
 
-
-        public byte ReadByte()
-        {
-            return (byte)this.ms.ReadByte();
-        }
-
-        public short ReadShort()
-        {
-            return this.ms.ReadShort();
-        }
-
-        public int ReadInt()
-        {
-            return this.ms.ReadInt();
-        }
-
-        public string ReadString()
-        {
-            return this.ms.ReadString();
-        }
-
-        public string[] ReadStringList()
-        {
-            return this.ms.ReadStringList();
-        }
-
-        public byte[] ReadBytes()
-        {
-            return this.ms.ReadBytes();
-        }
-
-        public byte[] ReadShortBytes()
-        {
-            return this.ms.ReadShortBytes();
-        }
-
-        public Dictionary<string, string[]> ReadStringMultimap()
-        {
-            return this.ms.ReadStringMultimap();
-        }
-
         public T ReadRows(Stream s, CqlMetadata metadata)
         {
             var model = TypeModel.Create();
@@ -122,61 +81,6 @@ namespace ProtoBuf.Cql
             result = (T)model.Deserialize(s, result, type, null, memberInfo.ToArray());
 
             return result;
-        }
-
-        public static CqlMetadata ReadMeta(Stream stream)
-        {
-            var meta = new CqlMetadata();
-            meta.Flags = (CqlMetadataFlag)stream.ReadInt();
-            meta.ColumnsCount = stream.ReadInt();
-
-            bool global = (meta.Flags & CqlMetadataFlag.GlobalTable) == CqlMetadataFlag.GlobalTable;
-            if (global)
-            {
-                meta.Keyspace = stream.ReadString();
-                meta.ColumnFamily = stream.ReadString();
-            }
-
-            meta.Columns = new MetadataColumn[meta.ColumnsCount];
-            for (var i = 0; i < meta.ColumnsCount; i++)
-            {
-                var col = new MetadataColumn();
-                if (!global)
-                {
-                    col.Keyspace = stream.ReadString();
-                    col.ColumnFamily = stream.ReadString();
-                }
-
-                col.ColumnName = stream.ReadString();
-                col.Type = ProcessColumnType(stream);
-                meta.Columns[i] = col;
-            }
-
-            return meta;
-        }
-
-        protected static CqlType ProcessColumnType(Stream stream)
-        {
-            var type = new CqlType();
-            type.ColumnType = (CqlColumnType)stream.ReadShort();
-            switch (type.ColumnType)
-            {
-                case CqlColumnType.Custom:
-                    type.CustomType = stream.ReadString();
-                    break;
-                case CqlColumnType.List:
-                case CqlColumnType.Set:
-                    type.SubType = new CqlType[1];
-                    type.SubType[0] = ProcessColumnType(stream);
-                    break;
-                case CqlColumnType.Map:
-                    type.SubType = new CqlType[2];
-                    type.SubType[0] = ProcessColumnType(stream);
-                    type.SubType[1] = ProcessColumnType(stream);
-                    break;
-            }
-
-            return type;
         }
     }
 }
